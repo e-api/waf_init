@@ -2,16 +2,18 @@
 
 # Configuration Paths
 NGINX_SRC="/www/server/nginx/src"
-NGINX_VER="1.29.4"
+NGINX_VER=$(/www/server/nginx/sbin/nginx -v 2>&1 | cut -d '/' -f 2 | cut -d ' ' -f 1)
 MODSEC_DIR="$NGINX_SRC/ModSecurity"
 MODSEC_NGINX="$NGINX_SRC/ModSecurity-nginx"
+GEOIP2_SRC="$NGINX_SRC/ngx_http_geoip2_module"
 CONF_DIR="/www/server/nginx/conf/modsec"
 NGINX_CONF="/www/server/nginx/conf/nginx.conf"
 
-# NO NEED TO INSTALL DEPENDENCIES
+echo "Detected Nginx Version: $NGINX_VER"
+
+# INSTALL DEPENDENCIES
 echo "--- 1. Installing Dependencies ---"
-echo "-------------skipped--------------"
-# apt update && apt install -y apt-utils autoconf automake build-essential git libcurl4-openssl-dev libgeoip-dev liblmdb-dev libpcre++-dev libtool libxml2-dev libyajl-dev pkgconf wget zlib1g-dev libjemalloc-dev
+apt update && apt install -y libmaxminddb-dev # apt-utils autoconf automake build-essential git libcurl4-openssl-dev libgeoip-dev liblmdb-dev libpcre++-dev libtool libxml2-dev libyajl-dev pkgconf wget zlib1g-dev libjemalloc-dev
 
 echo "--- 2. Building ModSecurity Engine ---"
 cd $NGINX_SRC
@@ -24,7 +26,10 @@ git submodule init && git submodule update
 
 echo "--- 3. Preparing Nginx Connector & Source ---"
 cd $NGINX_SRC
+# Download WAF Connector
 [ ! -d "$MODSEC_NGINX" ] && git clone --depth 1 https://github.com/SpiderLabs/ModSecurity-nginx.git
+# Download GeoIP2 Module
+[ ! -d "$GEOIP2_SRC" ] && git clone --depth 1 https://github.com/leev/ngx_http_geoip2_module.git
 
 rm -rf nginx-$NGINX_VER
 wget -qO- https://nginx.org/download/nginx-$NGINX_VER.tar.gz | tar xz
@@ -57,20 +62,17 @@ export LUAJIT_INC=/usr/local/include/luajit-2.1
 --with-ld-opt="-Wl,-E -ljemalloc" --with-cc-opt="-Wno-error" \
 --with-http_dav_module --add-module=$NGINX_SRC/nginx-dav-ext-module \
 --with-http_v3_module \
---add-dynamic-module=$MODSEC_NGINX
+--add-dynamic-module=$MODSEC_NGINX \
+--add-dynamic-module=$GEOIP2_SRC
 
 make modules
 mkdir -p /www/server/nginx/modules
 cp objs/ngx_http_modsecurity_module.so /www/server/nginx/modules/
+cp objs/ngx_http_geoip2_module.so /www/server/nginx/modules/
 
 echo "--- 5. Patching nginx.conf ---"
-if ! grep -q "ngx_http_modsecurity_module.so" "$NGINX_CONF"; then
-    # Insert load_module at the very first line
-    sed -i '1i load_module modules/ngx_http_modsecurity_module.so;' "$NGINX_CONF"
-    echo "Added load_module to $NGINX_CONF"
-else
-    echo "load_module already exists in $NGINX_CONF"
-fi
+grep -q "ngx_http_modsecurity_module.so" "$NGINX_CONF" && echo "load_module modSecurity already exists in $NGINX_CONF" || { sed -i '1i load_module modules/ngx_http_modsecurity_module.so;' "$NGINX_CONF"; echo "Added load_module modSecurity to $NGINX_CONF"; }
+grep -q "ngx_http_geoip2_module.so" "$NGINX_CONF" && echo "load_module geoIP already exists in $NGINX_CONF" || { sed -i '1i load_module modules/ngx_http_geoip2_module.so;' "$NGINX_CONF"; echo "Added load_module geoIP to $NGINX_CONF"; }
 
 echo "--- 6. Setting up OWASP CRS ---"
 mkdir -p $CONF_DIR
@@ -97,5 +99,10 @@ echo "Module compiled and loaded in $NGINX_CONF"
 echo "To activate, add these lines to your Website config in aaPanel:"
 echo "modsecurity on;"
 echo "modsecurity_rules_file $CONF_DIR/main.conf;"
+echo "Downloading GeoLite2-Country.mmdb to /www/server/nginx/conf/"
+wget https://github.com/P3TERX/GeoLite.mmdb/raw/download/GeoLite2-Country.mmdb -O /www/server/nginx/conf/GeoLite2-Country.mmdb
+echo "Restarting Nginx to apply changes."
 
 /www/server/nginx/sbin/nginx -t
+
+echo "Don't forget to add your GeoIP map logic to the 'http' block in nginx.conf and 'server' block at your site"
