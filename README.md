@@ -23,9 +23,9 @@ A robust compilation script that adds ModSecurity WAF and GeoIP2 country blockin
 
 ### Quick Install
 ```bash
-wget https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/compile-modsec-geoip.sh
-chmod +x compile-modsec-geoip.sh
-sudo ./compile-modsec-geoip.sh
+wget https://raw.githubusercontent.com/e-api/waf_init/main/waf_init.sh
+chmod +x waf_init.sh
+sudo ./waf_init.sh
 ```
 
 ### Step-by-Step Process
