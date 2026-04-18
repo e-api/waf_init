@@ -51,16 +51,16 @@ Add these directives to your website's `server` block in aaPanel:
 server {
     # ... existing configuration ...
     
-    # 1. Reject curl immediately to stop the specific attack you mentioned
-    if ($http_user_agent ~* "curl") { return 444; }
+    # 1. Block specific common scanners and automated tools
+    if ($is_scanner) { return 444; }
     # 2. Strict Rate Limit (reject instantly, no waiting room)
     limit_req zone=mylimit burst=1 nodelay; 
     # 3. Connection Limit (prevents IP from opening too many slots)
     limit_conn perip 5;
     # 4. ModSecurity (only runs if the request passes the above)
     modsecurity on;
-    # Optional: return a 429 status for blocked users
-    limit_req_status 429;
+    # Optional: return a 444 status for blocked users
+    limit_req_status 444;
     modsecurity_rules_file /www/server/nginx/conf/modsec/main.conf;
     
     # ... rest of configuration ...
@@ -88,6 +88,19 @@ http {
         "RU" 1;  # Russia
         "KP" 1;  # North Korea
     }
+
+    # Define blocked scanners
+    map $http_user_agent $is_scanner {
+        default 0;
+        # Common vulnerability scanners
+        ~*(nikto|acunetix|nessus|qualys|sqlmap|nmap|zgrab|masscan) 1;
+        # SEO/Scraper tools that ignore robots.txt
+        ~*(dotbot|rogerbot|mj12bot|ahrefs|semrush|petalbot) 1;
+        # Scripting libraries used for custom attacks (high threat)
+        ~*(libcurl|curl|python|go-http|php|java|perl|ruby|urllib|aiohttp|httpx) 1;
+        # Generic "bot" strings
+        ~*(headless|scanner|crawler|spider|discovery|inspect) 1;
+    }
     
     # ... rest of configuration ...
 }
@@ -99,9 +112,35 @@ Then in your website's `server` block:
 server {
     # ... existing configuration ...
     
-    if ($block_country = 1) {
-        return 403;
+    #PROXY-CONF-START
+    location ^~ / {
+      # Reject curl immediately to stop the specific attack you mentioned
+      if ($http_user_agent ~* "curl") { return 444; }
+      # Custom site url prefix block access
+      if ($uri ~* "^/(admin|livewire)") { set $check_geo 1; }
+      # Set defined country code to be accessible, others blocked
+      if ($allowed_country = "no") { set $is_blocked "${check_geo}1"; }
+      # If path is sensitive AND country is not, block it
+      if ($is_blocked = "11") { return 401; }
+      proxy_pass http://127.0.0.1:8000;
+      # proxy_set_header Host $http_host;
+      proxy_set_header Host $host; # Use $host
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Real-Port $remote_port;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme; # Add this
+      proxy_set_header X-Forwarded-Host $host; # Add this
+      proxy_set_header X-Forwarded-Port $server_port; # Add this
+      proxy_set_header REMOTE-HOST $remote_addr;
+      
+      proxy_connect_timeout 60s;
+      proxy_send_timeout 600s;
+      proxy_read_timeout 600s;
+      proxy_http_version 1.1;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
     }
+    #PROXY-CONF-END
     
     # ... rest of configuration ...
 }
