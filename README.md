@@ -51,7 +51,16 @@ Add these directives to your website's `server` block in aaPanel:
 server {
     # ... existing configuration ...
     
+    # 1. Reject curl immediately to stop the specific attack you mentioned
+    if ($http_user_agent ~* "curl") { return 444; }
+    # 2. Strict Rate Limit (reject instantly, no waiting room)
+    limit_req zone=mylimit burst=1 nodelay; 
+    # 3. Connection Limit (prevents IP from opening too many slots)
+    limit_conn perip 5;
+    # 4. ModSecurity (only runs if the request passes the above)
     modsecurity on;
+    # Optional: return a 429 status for blocked users
+    limit_req_status 429;
     modsecurity_rules_file /www/server/nginx/conf/modsec/main.conf;
     
     # ... rest of configuration ...
