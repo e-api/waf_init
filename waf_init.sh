@@ -13,7 +13,7 @@ echo "Detected Nginx Version: $NGINX_VER"
 
 # INSTALL DEPENDENCIES
 echo "--- 1. Installing Dependencies ---"
-apt update && apt install -y libmaxminddb-dev # apt-utils autoconf automake build-essential git libcurl4-openssl-dev libgeoip-dev liblmdb-dev libpcre++-dev libtool libxml2-dev libyajl-dev pkgconf wget zlib1g-dev libjemalloc-dev
+apt update && apt install -y libmaxminddb-dev libpcre2-dev apt-utils autoconf automake build-essential git libcurl4-openssl-dev libgeoip-dev liblmdb-dev libpcre++-dev libtool libxml2-dev libyajl-dev pkgconf wget zlib1g-dev libjemalloc-dev
 
 echo "--- 2. Building ModSecurity Engine ---"
 cd $NGINX_SRC
@@ -31,16 +31,10 @@ cd $NGINX_SRC
 # Download GeoIP2 Module
 [ ! -d "$GEOIP2_SRC" ] && git clone --depth 1 https://github.com/leev/ngx_http_geoip2_module.git
 
+# Download and extract Nginx source
 rm -rf nginx-$NGINX_VER
 wget -qO- https://nginx.org/download/nginx-$NGINX_VER.tar.gz | tar xz
 cd nginx-$NGINX_VER
-
-# Links for aaPanel library structure
-if [ -d "$NGINX_SRC/pcre-8.43" ]; then
-    ln -sf $NGINX_SRC/pcre-8.43 pcre-8.43
-else
-    echo "Error: PCRE source not found in $NGINX_SRC" && exit 1
-fi
 
 echo "--- 4. Compiling Dynamic Module ---"
 export LUAJIT_LIB=/usr/local/lib
@@ -52,7 +46,8 @@ export LUAJIT_INC=/usr/local/include/luajit-2.1
 --add-module=$NGINX_SRC/ngx_cache_purge \
 --add-module=$NGINX_SRC/nginx-sticky-module-ng-1.3.0 \
 --with-openssl=$NGINX_SRC/openssl \
---with-pcre=pcre-8.43 \
+--with-pcre \
+--with-pcre-jit \
 --with-http_v2_module --with-stream --with-stream_ssl_module --with-stream_ssl_preread_module \
 --with-http_stub_status_module --with-http_ssl_module --with-http_image_filter_module \
 --with-http_gzip_static_module --with-http_gunzip_module --with-http_sub_module \
