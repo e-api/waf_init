@@ -45,8 +45,6 @@ cd nginx-$NGINX_VER
 echo "--- 4. Compiling Dynamic Module ---"
 export LUAJIT_LIB=/usr/local/lib
 export LUAJIT_INC=/usr/local/include/luajit-2.1
-export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
-ldconfig
 
 ./configure --user=www --group=www --prefix=/www/server/nginx \
 --add-module=$NGINX_SRC/ngx_devel_kit \
