@@ -16,13 +16,14 @@ echo "--- 1. Installing Dependencies ---"
 apt update && apt install -y libmaxminddb-dev libpcre2-dev #apt-utils autoconf automake build-essential git libcurl4-openssl-dev libgeoip-dev liblmdb-dev libpcre++-dev libtool libxml2-dev libyajl-dev pkgconf wget zlib1g-dev libjemalloc-dev
 
 echo "--- 2. Building ModSecurity Engine ---"
-mkdir -p /www/server/nginx/src
+mkdir -p $NGINX_SRC
 cd $NGINX_SRC
 if [ ! -d "$MODSEC_DIR" ]; then
     git clone --depth 1 -b v3/master --single-branch https://github.com/SpiderLabs/ModSecurity
 fi
 cd ModSecurity
-git submodule init && git submodule update
+# FIXED: Use --init --recursive to get nested submodules like mbedtls
+git submodule update --init --recursive
 ./build.sh && ./configure && make -j$(nproc) && make install
 
 echo "--- 3. Preparing Nginx Connector & Source ---"
@@ -32,8 +33,8 @@ cd $NGINX_SRC
 # Download GeoIP2 Module
 [ ! -d "$GEOIP2_SRC" ] && git clone --depth 1 https://github.com/leev/ngx_http_geoip2_module.git
 
-# Verify GeoIP2 module exists
-if [ ! -f "$GEOIP2_SRC/config" ]; then
+# Verify GeoIP2 module exists (check directory, not config file)
+if [ ! -d "$GEOIP2_SRC" ]; then
     echo "Error: GeoIP2 module not found at $GEOIP2_SRC"
     exit 1
 fi
