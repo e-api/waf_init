@@ -32,14 +32,32 @@ cd $NGINX_SRC
 [ ! -d "$MODSEC_NGINX" ] && git clone --depth 1 https://github.com/SpiderLabs/ModSecurity-nginx.git
 # Download GeoIP2 Module
 [ ! -d "$GEOIP2_SRC" ] && git clone --depth 1 https://github.com/leev/ngx_http_geoip2_module.git
-# Download Nginx Devel Kit
+# Download ALL required third-party modules
+echo "Downloading required third-party modules..."
 [ ! -d "ngx_devel_kit" ] && git clone --depth 1 https://github.com/vision5/ngx_devel_kit.git
+[ ! -d "lua_nginx_module" ] && git clone --depth 1 https://github.com/openresty/lua-nginx-module.git lua_nginx_module
+[ ! -d "ngx_cache_purge" ] && git clone --depth 1 https://github.com/FRiCKLE/ngx_cache_purge.git
+[ ! -d "nginx-sticky-module-ng-1.3.0" ] && git clone --depth 1 https://github.com/ayty/nginx-sticky-module-ng.git nginx-sticky-module-ng-1.3.0
+[ ! -d "ngx_http_substitutions_filter_module-master" ] && git clone --depth 1 https://github.com/yaoweibin/ngx_http_substitutions_filter_module.git ngx_http_substitutions_filter_module-master
+[ ! -d "nginx-dav-ext-module" ] && git clone --depth 1 https://github.com/arut/nginx-dav-ext-module.git
 
-# Verify GeoIP2 module exists (check directory, not config file)
-if [ ! -d "$GEOIP2_SRC" ]; then
-    echo "Error: GeoIP2 module not found at $GEOIP2_SRC"
+# Verify all required modules exist
+echo "Verifying required modules..."
+MISSING_MODULES=0
+for dir in ngx_devel_kit lua_nginx_module ngx_cache_purge nginx-sticky-module-ng-1.3.0 ngx_http_substitutions_filter_module-master nginx-dav-ext-module ModSecurity-nginx ngx_http_geoip2_module; do
+    if [ -f "$dir/config" ]; then
+        echo "  ✓ $dir"
+    else
+        echo "  ✗ $dir - MISSING or incomplete"
+        MISSING_MODULES=1
+    fi
+done
+
+if [ $MISSING_MODULES -eq 1 ]; then
+    echo "FATAL: Some required modules are missing. Please check the errors above."
     exit 1
 fi
+echo "All modules verified successfully"
 
 # Download and extract Nginx source
 rm -rf nginx-$NGINX_VER
