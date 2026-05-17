@@ -46,6 +46,13 @@ echo "--- 4. Compiling Dynamic Module ---"
 export LUAJIT_LIB=/usr/local/lib
 export LUAJIT_INC=/usr/local/include/luajit-2.1
 
+# Make absolutely sure we're in the Nginx source directory
+cd $NGINX_SRC/nginx-$NGINX_VER || {
+    echo "FATAL: Cannot enter Nginx source directory"
+    exit 1
+}
+echo "Current directory: $(pwd)"
+
 ./configure --user=www --group=www --prefix=/www/server/nginx \
 --add-module=$NGINX_SRC/ngx_devel_kit \
 --add-module=$NGINX_SRC/lua_nginx_module \
@@ -66,10 +73,28 @@ export LUAJIT_INC=/usr/local/include/luajit-2.1
 --add-dynamic-module=$MODSEC_NGINX \
 --add-dynamic-module=$GEOIP2_SRC
 
+# Check if configure succeeded
+if [ $? -ne 0 ]; then
+    echo "FATAL: ./configure failed"
+    exit 1
+fi
+
+echo "Running make modules..."
 make modules
+
+# Check if make succeeded
+if [ $? -ne 0 ]; then
+    echo "FATAL: make modules failed"
+    exit 1
+fi
+
+# Verify .so files were created
+echo "Checking for compiled modules..."
+ls -la objs/*.so
+
 mkdir -p /www/server/nginx/modules
-cp objs/ngx_http_modsecurity_module.so /www/server/nginx/modules/
-cp objs/ngx_http_geoip2_module.so /www/server/nginx/modules/
+cp objs/ngx_http_modsecurity_module.so /www/server/nginx/modules/ && echo "Copied modsecurity module" || echo "FAILED to copy modsecurity module"
+cp objs/ngx_http_geoip2_module.so /www/server/nginx/modules/ && echo "Copied geoip2 module" || echo "FAILED to copy geoip2 module"
 
 echo "--- 5. Patching nginx.conf ---"
 grep -q "ngx_http_modsecurity_module.so" "$NGINX_CONF" && echo "load_module modSecurity already exists in $NGINX_CONF" || { sed -i '1i load_module modules/ngx_http_modsecurity_module.so;' "$NGINX_CONF"; echo "Added load_module modSecurity to $NGINX_CONF"; }
