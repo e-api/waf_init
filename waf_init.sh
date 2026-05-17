@@ -32,6 +32,8 @@ cd $NGINX_SRC
 [ ! -d "$MODSEC_NGINX" ] && git clone --depth 1 https://github.com/SpiderLabs/ModSecurity-nginx.git
 # Download GeoIP2 Module
 [ ! -d "$GEOIP2_SRC" ] && git clone --depth 1 https://github.com/leev/ngx_http_geoip2_module.git
+# Download Nginx Devel Kit
+[ ! -d "ngx_devel_kit" ] && git clone --depth 1 https://github.com/vision5/ngx_devel_kit.git
 
 # Verify GeoIP2 module exists (check directory, not config file)
 if [ ! -d "$GEOIP2_SRC" ]; then
