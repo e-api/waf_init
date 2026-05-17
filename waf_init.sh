@@ -31,6 +31,12 @@ cd $NGINX_SRC
 # Download GeoIP2 Module
 [ ! -d "$GEOIP2_SRC" ] && git clone --depth 1 https://github.com/leev/ngx_http_geoip2_module.git
 
+# Verify GeoIP2 module exists
+if [ ! -f "$GEOIP2_SRC/config" ]; then
+    echo "Error: GeoIP2 module not found at $GEOIP2_SRC"
+    exit 1
+fi
+
 # Download and extract Nginx source
 rm -rf nginx-$NGINX_VER
 wget -qO- https://nginx.org/download/nginx-$NGINX_VER.tar.gz | tar xz
@@ -39,6 +45,8 @@ cd nginx-$NGINX_VER
 echo "--- 4. Compiling Dynamic Module ---"
 export LUAJIT_LIB=/usr/local/lib
 export LUAJIT_INC=/usr/local/include/luajit-2.1
+export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+ldconfig
 
 ./configure --user=www --group=www --prefix=/www/server/nginx \
 --add-module=$NGINX_SRC/ngx_devel_kit \
