@@ -16,6 +16,7 @@ echo "--- 1. Installing Dependencies ---"
 apt update && apt install -y libmaxminddb-dev libpcre2-dev #apt-utils autoconf automake build-essential git libcurl4-openssl-dev libgeoip-dev liblmdb-dev libpcre++-dev libtool libxml2-dev libyajl-dev pkgconf wget zlib1g-dev libjemalloc-dev
 
 echo "--- 2. Building ModSecurity Engine ---"
+mkdir -p /www/server/nginx/src
 cd $NGINX_SRC
 if [ ! -d "$MODSEC_DIR" ]; then
     git clone --depth 1 -b v3/master --single-branch https://github.com/SpiderLabs/ModSecurity
