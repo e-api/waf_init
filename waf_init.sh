@@ -13,7 +13,7 @@ echo "Detected Nginx Version: $NGINX_VER"
 
 # INSTALL DEPENDENCIES
 echo "--- 1. Installing Dependencies ---"
-apt update && apt install -y libmaxminddb-dev libpcre2-dev apt-utils autoconf automake build-essential git libcurl4-openssl-dev libgeoip-dev liblmdb-dev libpcre++-dev libtool libxml2-dev libyajl-dev pkgconf wget zlib1g-dev libjemalloc-dev
+apt update && apt install -y libmaxminddb-dev libpcre2-dev #apt-utils autoconf automake build-essential git libcurl4-openssl-dev libgeoip-dev liblmdb-dev libpcre++-dev libtool libxml2-dev libyajl-dev pkgconf wget zlib1g-dev libjemalloc-dev
 
 echo "--- 2. Building ModSecurity Engine ---"
 cd $NGINX_SRC
