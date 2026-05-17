@@ -78,7 +78,6 @@ echo "Current directory: $(pwd)"
 --add-module=$NGINX_SRC/ngx_devel_kit \
 --add-module=$NGINX_SRC/lua_nginx_module \
 --add-module=$NGINX_SRC/ngx_cache_purge \
---with-openssl \
 --with-pcre \
 --with-pcre-jit \
 --with-http_v2_module --with-stream --with-stream_ssl_module --with-stream_ssl_preread_module \
