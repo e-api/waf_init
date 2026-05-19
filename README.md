@@ -51,16 +51,128 @@ Add these directives to your website's `server` block in aaPanel:
 server {
     # ... existing configuration ...
     
-    # 1. Block specific common scanners and automated tools
-    if ($is_scanner) { return 444; }
-    # 2. Strict Rate Limit (reject instantly, no waiting room)
-    limit_req zone=mylimit burst=1 nodelay; 
-    # 3. Connection Limit (prevents IP from opening too many slots)
-    limit_conn perip 5;
-    # 4. ModSecurity (only runs if the request passes the above)
+    access_by_lua_block {
+
+        local ip = ngx.var.binary_remote_addr
+        local ua = ngx.var.http_user_agent or ""
+        local accept = ngx.var.http_accept or ""
+        local lang = ngx.var.http_accept_language or ""
+        local method = ngx.req.get_method()
+        local uri = ngx.var.uri
+        local now = ngx.now()
+
+        local score_dict = ngx.shared.bot_score
+        local ban_dict = ngx.shared.bot_ban
+        local seen_dict = ngx.shared.bot_seen
+        local burst_dict = ngx.shared.burst
+
+        if ua:match("Googlebot") then return end
+        if ua:match("Bingbot") then return end
+        if ua:match("Uptime|Pingdom|StatusCake|HealthCheck") then return end
+        if ua:match("Stripe|GitHub-Hookshot|Slackbot|Discordbot") then return end
+
+        if ban_dict:get(ip) then
+            return ngx.exit(444)
+        end
+
+        local score = score_dict:get(ip) or 0
+        local last = seen_dict:get(ip) or now
+
+        local decay = math.floor((now - last) / 60) * 6
+        score = score - decay
+        if score < 0 then score = 0 end
+
+        seen_dict:set(ip, now)
+
+        if ua == "" then score = score + 25 end
+        if accept == "" then score = score + 10 end
+        if lang == "" then score = score + 10 end
+
+        if ua:match("curl|python|aiohttp|httpx|go-http|libcurl") then
+            score = score + 12
+        end
+
+        if ua:match("headless|selenium|puppeteer") then
+            score = score + 50
+        end
+
+        if ua:match("nikto|sqlmap|nmap|acunetix|nessus|qualys|zgrab|masscan") then
+            score = score + 80
+        end
+
+        if method == "TRACE" or method == "CONNECT" then
+            score = score + 50
+        end
+
+        if uri:match("wp%-login|xmlrpc|phpmyadmin|%.env|config|admin") then
+            score = score + 40
+        end
+
+        local burst = burst_dict:get(ip) or 0
+        burst = burst + 1
+        burst_dict:set(ip, burst, 1)
+
+        if burst > 70 then
+            ban_dict:set(ip, true, 600)
+            return ngx.exit(444)
+        end
+
+        score_dict:set(ip, score, 120)
+
+        if score >= 110 then
+            ban_dict:set(ip, true, 600)
+            return ngx.exit(444)
+        end
+
+        if score >= 70 then
+            ngx.header.content_type = "text/html"
+            ngx.say([[
+                <html>
+                <body style="font-family:Arial;text-align:center;padding-top:50px">
+                    <h3>Security check in progress...</h3>
+                    <p>Please wait...</p>
+                    <script>
+                        setTimeout(function () {
+                            fetch(window.location.href, {credentials:'include'})
+                                .then(() => location.reload());
+                        }, 1200);
+                    </script>
+                </body>
+                </html>
+            ]])
+            return ngx.exit(200)
+        end
+
+        if score >= 55 then
+            return ngx.exit(403)
+        end
+
+        local function hit(dict, limit, code)
+            local c = dict:get(ip) or 0
+            c = c + 1
+            dict:set(ip, c, 10)
+
+            if c > limit then
+                return ngx.exit(code)
+            end
+        end
+
+        if uri:match("^/login") then
+            return hit(ngx.shared.rate_login, 5, 403)
+        end
+
+        if uri:match("^/api") then
+            return hit(ngx.shared.rate_api, 30, 403)
+        end
+
+        return hit(ngx.shared.rate_general, 80, 429)
+    }
+
+    # Optional: return a 403 status for blocked users
+    # limit_req_status 444;
+
+    # ModSecurity (only runs if the request passes the above)
     modsecurity on;
-    # Optional: return a 444 status for blocked users
-    limit_req_status 444;
     modsecurity_rules_file /www/server/nginx/conf/modsec/main.conf;
     
     # ... rest of configuration ...
@@ -74,13 +186,26 @@ Add this to the `http` block in `/www/server/nginx/conf/nginx.conf`:
 ```nginx
 http {
     # ... existing configuration ...
-    
+
+    #LUA BLOCK BOT
+	lua_shared_dict bot_score 200m;
+    lua_shared_dict bot_ban 50m;
+    lua_shared_dict bot_seen 100m;
+    lua_shared_dict burst 50m;
+    lua_shared_dict rate_general 50m;
+    lua_shared_dict rate_api 50m;
+    lua_shared_dict rate_login 20m;
+    lua_shared_dict ip_reputation 100m;
+    #LUA BLOCK BOT
+		
+    # RATE LIMIT START
+    limit_req_zone $binary_remote_addr zone=mylimit:10m rate=5r/s;
+    limit_conn_zone $binary_remote_addr zone=conn_limit:10m;
+    # RATE LIMIT END
     # Load GeoIP2 database
     geoip2 /www/server/nginx/conf/GeoLite2-Country.mmdb {
-        auto_reload 7d;
-        $geoip2_country_code country iso_code;
+        $geoip2_data_country_code country iso_code;
     }
-    
     # Define blocked countries
     map $geoip2_country_code $block_country {
         default 0;
@@ -89,18 +214,12 @@ http {
         "KP" 1;  # North Korea
     }
 
-    # Define blocked scanners
-    map $http_user_agent $is_scanner {
-        default 0;
-        # Common vulnerability scanners
-        ~*(nikto|acunetix|nessus|qualys|sqlmap|nmap|zgrab|masscan) 1;
-        # SEO/Scraper tools that ignore robots.txt
-        ~*(dotbot|rogerbot|mj12bot|ahrefs|semrush|petalbot) 1;
-        # Scripting libraries used for custom attacks (high threat)
-        ~*(libcurl|curl|python|go-http|php|java|perl|ruby|urllib|aiohttp|httpx) 1;
-        # Generic "bot" strings
-        ~*(headless|scanner|crawler|spider|discovery|inspect) 1;
+    # DEFINE BOT START 
+    map $http_user_agent $bad_bot {
+        default 0;    
+        ~*(nikto|acunetix|nessus|qualys|sqlmap|nmap|zgrab|masscan|fimap) 1;
     }
+    # DEFINE BOT END
     
     # ... rest of configuration ...
 }
