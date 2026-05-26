@@ -13,7 +13,7 @@ A robust compilation script that adds ModSecurity WAF and GeoIP2 country blockin
 
 ## 📋 Prerequisites
 
-- Nginx 1.20+ (tested with 1.29.4)
+- Nginx 1.30+ (tested with 1.30.1)
 - Debian/Ubuntu-based system with `apt` package manager
 - Existing aaPanel Nginx installation at `/www/server/nginx`
 - Root/sudo access
