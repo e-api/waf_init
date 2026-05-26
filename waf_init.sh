@@ -8,8 +8,14 @@ MODSEC_NGINX="$NGINX_SRC/ModSecurity-nginx"
 GEOIP2_SRC="$NGINX_SRC/ngx_http_geoip2_module"
 CONF_DIR="/www/server/nginx/conf/modsec"
 NGINX_CONF="/www/server/nginx/conf/nginx.conf"
+NGINX_MODULE="/www/server/nginx/modules"
 
 echo "Detected Nginx Version: $NGINX_VER"
+echo "Deleting pre-version config settings"
+
+rm -rf $NGINX_SRC
+rm -rf $CONF_DIR
+rm -rf $NGINX_MODULE
 
 # INSTALL DEPENDENCIES
 echo "--- 1. Installing Dependencies ---"
