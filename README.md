@@ -204,14 +204,13 @@ http {
     # RATE LIMIT END
     # Load GeoIP2 database
     geoip2 /www/server/nginx/conf/GeoLite2-Country.mmdb {
-        $geoip2_data_country_code country iso_code;
+        $geoip2_country_code country iso_code;
     }
-    # Define blocked countries
+    
+    # Define Whitelisted countries
     map $geoip2_country_code $block_country {
         default 0;
         "CN" 1;  # China
-        "RU" 1;  # Russia
-        "KP" 1;  # North Korea
     }
 
     # DEFINE BOT START 
