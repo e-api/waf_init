@@ -209,8 +209,8 @@ http {
     
     # Define Whitelisted countries
     map $geoip2_country_code $block_country {
-        default 0;
-        "CN" 1;  # China
+        default 1;
+        "CN" 0;  # China
     }
 
     # DEFINE BOT START 
